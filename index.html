@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apickli Studio v4 — Referências Inteligentes</title>
+<link rel="icon" href="data:,">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<!-- MODAL: CONFIGURAÇÕES -->
+<div id="modal-settings" class="modal-backdrop" style="display:none">
+  <div class="modal-box settings-modal">
+    <h3>⚙️ Configurações</h3>
+    <p>Centralize aqui a chave da IA e as preferências da interface.</p>
+
+    <div class="settings-section">
+      <div class="settings-title">🔑 OpenRouter API Key</div>
+      <div class="alert alert-info" style="margin-bottom:12px;">
+        A chave é usada apenas para gerar com IA e fica salva no navegador. Para testar, acesse
+        <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>.
+      </div>
+      <div class="input-group mb-2" style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;">
+        <input id="modal-key-input" class="form-control" type="password" placeholder="sk-or-v1-..." style="border:none;border-radius:0;padding:10px 12px;font-family:var(--mono);font-size:12px;">
+        <span class="key-toggle" onclick="toggleKeyVis('modal-key-input',this)">Mostrar</span>
+      </div>
+      <div id="modal-key-status" style="font-size:12px;color:var(--muted);min-height:16px;"></div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-title">🌙 Aparência</div>
+      <label class="toggle-row" for="dark-mode-toggle">
+        <span>Modo dark</span>
+        <input id="dark-mode-toggle" type="checkbox" onchange="toggleDarkMode(this.checked)">
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1" onclick="saveSettings()">💾 Salvar configurações</button>
+      <button class="btn btn-ghost" onclick="closeSettings()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <div class="nav-logo">APICKLI <span>STUDIO</span> <span style="font-size:10px;color:#374151;margin-left:4px;">v4</span></div>
+  <div class="nav-tab active" id="ntab-gen" onclick="switchPage('gen')">⚙️ Gerador</div>
+  <div class="nav-tab t-chat" id="ntab-chat" onclick="switchPage('chat')">💬 Chat da API</div>
+  <div class="nav-tab t-reference" id="ntab-reference" onclick="switchPage('reference')">📚 Base de Referências</div>
+  <div class="nav-tab t-analyzer" id="ntab-analyzer" onclick="switchPage('analyzer')">🔍 Analisador</div>
+  <div class="nav-right">
+    <div class="api-key-indicator" id="apikey-indicator" onclick="openSettings()" title="Abrir configurações">
+      <div class="dot" id="apikey-dot"></div>
+      <span id="apikey-label">Sem chave API</span>
+    </div>
+    <button class="settings-btn" onclick="openSettings()" title="Configurações">⚙️</button>
+  </div>
+</nav>
+
+<!-- ═══════════ PAGE 1: GERADOR ═══════════ -->
+<div id="page-gen" class="page active">
+  <div class="row g-3">
+    <div class="col-lg-7">
+
+      <!-- Card 0: Swagger + ZIP upload (topo, primeiro passo) -->
+      <div class="card" style="border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue-dim);">
+        <div class="card-hd" style="background: var(--blue-dim);">
+          <span class="badge-n blue">📋</span>
+          <span>Importar Swagger / OpenAPI</span>
+          <span style="font-size:11px;color:var(--blue);font-weight:400;margin-left:6px;">— preenche tudo automaticamente</span>
+        </div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <div class="upload-zone" id="gen-sw-zone"
+                   onclick="document.getElementById('gen-sw-input').click()"
+                   ondrop="dropGenFile(event,'sw')"
+                   ondragover="event.preventDefault();this.classList.add('drag')"
+                   ondragleave="this.classList.remove('drag')" style="padding:18px 12px;">
+                <div class="uz-icon" style="font-size:24px;">📋</div>
+                <div class="uz-label" id="gen-sw-label">Swagger / OpenAPI</div>
+                <div class="uz-hint">.json ou .yaml — auto-detecta endpoints, body, prefixos</div>
+              </div>
+              <input type="file" id="gen-sw-input" accept=".json,.yaml,.yml" style="display:none" onchange="loadGenSwagger(this.files[0])">
+            </div>
+            <div class="col-md-6">
+              <div class="upload-zone" id="gen-zip-zone"
+                   onclick="document.getElementById('gen-zip-input').click()"
+                   ondrop="dropGenFile(event,'zip')"
+                   ondragover="event.preventDefault();this.classList.add('drag')"
+                   ondragleave="this.classList.remove('drag')" style="padding:18px 12px;">
+                <div class="uz-icon" style="font-size:24px;">📦</div>
+                <div class="uz-label" id="gen-zip-label">Projeto Backend (ZIP)</div>
+                <div class="uz-hint">.zip apickli — auto-detecta apps, bodies e tokens</div>
+              </div>
+              <input type="file" id="gen-zip-input" accept=".zip" style="display:none" onchange="loadGenZip(this.files[0])">
+            </div>
+          </div>
+
+          <!-- Status após carregar o swagger -->
+          <div id="gen-sw-status" style="display:none; margin-top:10px;"></div>
+
+          <!-- Seletor de endpoint (aparece depois de carregar o swagger) -->
+          <div id="gen-ep-selector-wrap" style="display:none; margin-top:12px;">
+            <label class="form-label">Endpoint a gerar <span id="gen-ep-count" style="font-weight:400;text-transform:none;"></span></label>
+            <div class="ep-selector" id="gen-ep-list"></div>
+          </div>
+
+          <div class="postman-box" id="postman-box" style="display:none; margin-top:12px;">
+            <div class="postman-info">
+              <b>📮 Collection Postman</b>
+              <div id="postman-status" style="font-size:11px;color:var(--muted);margin-top:2px;">Gere uma collection com os métodos, URLs e headers obrigatórios do Swagger.</div>
+              <div id="postman-server-status" style="font-size:11px;color:var(--muted);margin-top:2px;">Servidor: Test SaaS</div>
+            </div>
+            <div class="postman-actions">
+              <label class="form-label" for="postman-collection-name" style="margin:0;font-size:10px;">Nome da collection</label>
+              <input id="postman-collection-name" class="form-control form-control-sm" placeholder="Minha API - Test SaaS" style="min-width:220px;">
+              <button class="btn btn-blue btn-sm" onclick="downloadPostmanCollection()">📥 Baixar para importar no Postman</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 1: Identificação -->
+      <div class="card">
+        <div class="card-hd"><span class="badge-n">1</span>Identificação da API <span id="id-auto-tag" class="auto-tag" style="display:none;">auto</span></div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">Feature Name</label>
+              <input id="fn" class="form-control" placeholder="customers-clrnccomorders-v1">
+            </div>
+            <div class="col-3"><label class="form-label">Sufixo Body</label><input id="bs" class="form-control" placeholder="orders"></div>
+            <div class="col-3"><label class="form-label">Verbo HTTP</label>
+              <select id="vb" class="form-select"><option>POST</option><option>PUT</option><option>GET</option><option>DELETE</option><option>PATCH</option></select>
+            </div>
+            <div class="col-8"><label class="form-label">Endpoint</label><input id="ep" class="form-control" placeholder="/customers/v1/clr/nc/com/orders"></div>
+            <div class="col-4"><label class="form-label">Verbo 405</label>
+              <select id="v405" class="form-select"><option>DELETE</option><option>GET</option><option>PUT</option><option>POST</option></select>
+            </div>
+            <div class="col-12"><label class="form-label">Background (descrição)</label><input id="bg" class="form-control" placeholder="API de ordens Claro COM"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Error Codes -->
+      <div class="card">
+        <div class="card-hd"><span class="badge-n">2</span>Prefixos de ErrorCode <span id="ec-auto-tag" class="auto-tag" style="display:none;">auto</span></div>
+        <div class="card-body">
+          <div class="alert alert-warn">⚠️ <b>400</b> usa um prefixo específico. <b>401, 403, 405, 406, 415, 429</b> usam outro prefixo.</div>
+          <div class="row g-2">
+            <div class="col-6"><label class="form-label">Prefixo ErrorCode 400</label><input id="ep400" class="form-control" placeholder="API-NCCOMORDERS"></div>
+            <div class="col-6"><label class="form-label">Prefixo ErrorCode 401–429</label><input id="epx" class="form-control" placeholder="API-CLRNCCOMORDERS"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Credenciais -->
+      <div class="card">
+        <div class="card-hd"><span class="badge-n">3</span>Credenciais dos Apps <span id="apps-auto-tag" class="auto-tag" style="display:none;">auto-detectados do ZIP</span></div>
+        <div class="card-body">
+          <div class="alert alert-info">Os nomes dos apps são detectados automaticamente do ZIP/Swagger. Insira <b>apenas os tokens Basic</b> (os campos de nome ficam em branco = usa do ZIP).</div>
+          <div class="row g-2">
+            <div class="col-4"><label class="form-label">🟢 App OK (nome)</label><input id="appOk" class="form-control" placeholder="Auto-detectado do ZIP"></div>
+            <div class="col-8"><label class="form-label">Token OK</label><input id="tokOk" class="form-control" placeholder="Basic eyJhb..."></div>
+            <div class="col-4"><label class="form-label">🔴 App NPER (nome)</label><input id="appNp" class="form-control" placeholder="Auto-detectado do ZIP"></div>
+            <div class="col-8"><label class="form-label">Token NPER</label><input id="tokNp" class="form-control" placeholder="Basic eyJhb..."></div>
+            <div class="col-4"><label class="form-label">🟡 App NQ (nome)</label><input id="appNq" class="form-control" placeholder="Auto-detectado do ZIP"></div>
+            <div class="col-8"><label class="form-label">Token NQ</label><input id="tokNq" class="form-control" placeholder="Basic eyJhb..."></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Body + Schema unificados (vindos do Swagger) -->
+      <div class="card">
+        <div class="card-hd"><span class="badge-n">4</span>Body &amp; Schema de Validações <span id="body-auto-tag" class="auto-tag" style="display:none;">extraído do Swagger</span></div>
+        <div class="card-body">
+          <div id="body-swagger-hint" class="alert alert-success" style="display:none;">
+            ✅ Body e campos obrigatórios extraídos automaticamente do Swagger. Você pode editar abaixo se necessário.
+          </div>
+          <div id="body-manual-hint" class="alert alert-info" style="display:none;">
+            Sem Swagger carregado — preencha o body manualmente.
+          </div>
+          <label class="form-label">Body Default (JSON) <span id="bdef-auto-tag" class="auto-tag" style="display:none;">auto</span></label>
+          <textarea id="bdef" class="form-control" rows="4" placeholder='{"data":{"externalId":"","customerId":""}}'></textarea>
+          <div style="margin-top:12px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <label class="form-label" style="margin:0;">Campos Obrigatórios (Cenário 400) <span id="sch-auto-tag" class="auto-tag" style="display:none;">auto</span></label>
+            </div>
+            <textarea id="sch" class="form-control" rows="3" placeholder='{"data":{"externalId":"","customerId":""}}' style="margin-bottom:8px;"></textarea>
+            <span id="sts" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+          <div id="sfc" style="display:none;margin-top:12px;">
+            <div style="display:flex;gap:8px;padding:6px 10px;background:#f5f6f8;border-radius:6px 6px 0 0;font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">
+              <span style="width:22px;">✓</span><span style="flex:1;">Campo</span><span style="width:160px;">Message</span><span style="width:210px;">DetailedMessage</span>
+            </div>
+            <div id="sfl" class="schema-tree"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5: Cenários -->
+      <div class="card">
+        <div class="card-hd"><span class="badge-n">5</span>Cenários a Incluir</div>
+        <div class="card-body"><div class="chips" id="chips"></div></div>
+      </div>
+
+
+      <!-- Botão de gerar -->
+      <div style="display:flex;gap:10px;margin-bottom:4px;">
+        <button class="btn btn-primary btn-full" onclick="gerar()" style="flex:2;">🚀 GERAR FEATURE (manual)</button>
+        <button class="btn btn-green btn-full" id="btn-gen-ia" onclick="gerarComIA()" style="flex:2;" disabled>✨ GERAR COM IA</button>
+      </div>
+      <div id="gen-ia-status" style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;"></div>
+      <div id="gen-ep-progress-wrap" style="display:none;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <span id="gen-ep-progress-label" style="font-size:12px;color:var(--muted);flex:1;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="downloadAllGenFeatures()" id="btn-gen-dl-all" style="display:none;">💾 Baixar ZIP</button>
+        </div>
+        <div class="progress-wrap"><div class="progress-fill" id="gen-ep-progress-fill" style="width:0%"></div></div>
+        <div id="generation-log" class="live-log" style="margin-top:10px;display:none;">Aguardando geração...</div>
+        <div id="generation-reference-panel" class="generation-ref-panel" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="col-lg-5">
+      <div class="sticky-preview">
+        <div class="card" style="margin:0">
+          <div class="card-hd" style="border-bottom:none;padding-bottom:0;">
+            <div class="subtabs" style="border-bottom:none;flex:1;margin:-11px -16px 0;">
+              <div class="subtab sel" onclick="stab('f')">📄 .feature</div>
+              <div class="subtab" onclick="stab('s')">📝 steps.js</div>
+              <div class="subtab" onclick="stab('c')">⚙️ config.json</div>
+            </div>
+          </div>
+          <div style="padding:12px 14px;">
+            <div id="tf" class="preview" style="min-height:420px;">Importe um Swagger ou preencha os campos e clique Gerar...</div>
+            <div id="ts" class="preview" style="display:none;min-height:420px;"></div>
+            <div id="tc" class="preview" style="display:none;min-height:420px;"></div>
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-ghost btn-sm" onclick="copiar()" style="flex:1;">📋 Copiar</button>
+              <button class="btn btn-ghost btn-sm" onclick="baixar()" style="flex:1;">💾 Baixar todos</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PAGE 3: CHAT ═══════════ -->
+<div id="page-chat" class="page">
+  <div class="chat-wrap">
+    <div class="chat-sidebar">
+      <div class="card" style="margin:0">
+        <div class="card-hd"><span class="badge-n green">📂</span>Contexto da API</div>
+        <div class="card-body" style="padding:10px;">
+          <div id="chat-context-info">
+            <div class="alert alert-info" style="font-size:12px;margin:0;">Carregue um Swagger na aba <b>Gerador</b> ou aqui embaixo.</div>
+          </div>
+          <div class="upload-zone" id="chat-sw-zone" style="padding:14px;margin-top:10px;"
+               onclick="document.getElementById('chat-sw-input').click()">
+            <div class="uz-icon" style="font-size:22px;">📋</div>
+            <div class="uz-label" style="font-size:12px;">Swagger aqui</div>
+            <div class="uz-hint">.json ou .yaml</div>
+          </div>
+          <input type="file" id="chat-sw-input" accept=".json,.yaml,.yml" style="display:none" onchange="loadChatSwagger(this.files[0])">
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-hd"><span class="badge-n green">💡</span>Perguntas Rápidas</div>
+        <div class="card-body" style="padding:8px;">
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Quais são todos os endpoints desta API com seus métodos HTTP?')">🔗 Listar todos os endpoints</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Quais parâmetros são obrigatórios em cada endpoint?')">✅ Parâmetros obrigatórios</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Explique detalhadamente o que esta API faz e seus principais casos de uso')">📖 O que a API faz?</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Quais são os possíveis códigos de erro, seus significados e quando ocorrem?')">⚠️ Códigos de erro</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Mostre um exemplo completo de request e response JSON para o endpoint principal')">📤 Exemplo request/response</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Como funciona a autenticação desta API? Quais headers são necessários?')">🔑 Como autenticar?</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Quais campos do body são obrigatórios? Quais são opcionais?')">📝 Campos do body</button>
+          <button class="btn btn-ghost quick-btn" onclick="sendQuick('Gere a feature Apickli completa para o endpoint principal desta API')">🚀 Gerar feature completa</button>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-hd"><span class="badge-n green">⚙️</span>Opções</div>
+        <div class="card-body" style="padding:10px;">
+          <button class="btn btn-ghost btn-sm" style="width:100%" onclick="clearChat()">🗑️ Limpar conversa</button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-main">
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg system">💬 Chat da API — Carregue um Swagger para ter contexto completo</div>
+        <div class="msg ai">
+          <b>👋 Olá! Sou o assistente especialista em APIs Apickli/Claro.</b><br>
+          Carregue um Swagger na barra lateral ou na aba <b>Gerador</b> para eu ter acesso completo à sua API. Posso responder sobre endpoints, parâmetros, schemas, autenticação, erros e gerar features completas.
+        </div>
+      </div>
+      <div class="chat-input-box">
+        <textarea id="chat-input" rows="2" placeholder="Pergunte sobre endpoints, parâmetros, schemas, erros..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+        <button class="btn btn-green" onclick="sendChat()" id="btn-send-chat">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ PAGE 4: BASE DE REFERÊNCIAS ═══════════ -->
+<div id="page-reference" class="page">
+  <div class="alert alert-info">
+    📚 <b>Base de Referências</b> — envie ZIPs de projetos já resolvidos para o sistema aprender padrões locais e usar como base nas próximas gerações.
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-hd"><span class="badge-n purple">1</span>Adicionar projetos resolvidos</div>
+        <div class="card-body">
+          <div class="upload-zone" id="ref-zip-zone"
+               onclick="document.getElementById('ref-zip-input').click()"
+               ondrop="dropReferenceZips(event)"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')">
+            <div class="uz-icon">📦</div>
+            <div class="uz-label">Enviar ZIPs de referência</div>
+            <div class="uz-hint">Selecione vários .zip de projetos 100% resolvidos</div>
+          </div>
+          <input type="file" id="ref-zip-input" accept=".zip" multiple style="display:none" onchange="handleReferenceZipInput(this.files)">
+
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button class="btn btn-purple btn-sm" onclick="document.getElementById('ref-zip-input').click()">➕ Adicionar ZIPs</button>
+            <button class="btn btn-ghost btn-sm" onclick="chooseReferenceFolder()">📁 Escolher pasta local</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportReferenceManifest()">📤 Exportar índice</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportKnowledgeBase()">💾 Exportar conhecimento</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('knowledge-import-input').click()">📥 Importar conhecimento</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearAllReferences()">🗑️ Limpar base</button>
+            <input type="file" id="knowledge-import-input" accept=".json" style="display:none" onchange="importKnowledgeBase(this.files[0])">
+          </div>
+          <div id="ref-folder-status" style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;">
+            Salvamento padrão: IndexedDB do navegador. No Chrome/Edge, você também pode escolher uma pasta local para gravar os ZIPs.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="badge-n purple">2</span>Aprendizado contínuo</div>
+        <div class="card-body">
+          <div class="alert alert-success" style="margin-bottom:10px;">
+            Quando você aceitar correções no Analisador, o programa salva uma regra local para usar nas próximas gerações.
+          </div>
+          <div id="learning-summary" class="ref-summary-grid"></div>
+          <div class="manual-rule-box" style="margin-top:10px;">
+            <label class="form-label">Regra manual permanente</label>
+            <textarea id="manual-rule-input" class="form-control" rows="2" placeholder="Ex: Para validação de schema neste padrão, usar 422 em vez de 400."></textarea>
+            <button class="btn btn-purple btn-sm" style="margin-top:8px" onclick="addManualLearningRule()">➕ Salvar regra manual</button>
+          </div>
+          <div id="learning-rules-list" class="learning-rules-list"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="exportLearningMemory()">📤 Exportar memória</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearLearningMemory()">🧹 Limpar memória</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-hd"><span class="badge-n purple">3</span>Referências carregadas <span id="ref-count-badge" style="font-size:11px;font-weight:400;color:var(--muted);margin-left:4px;"></span></div>
+        <div class="card-body">
+          <div id="ref-summary" class="ref-summary-grid"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+            <label class="form-label" style="margin:0;">Filtro</label>
+            <select id="ref-filter" class="form-select" style="width:180px" onchange="renderReferenceBase()">
+              <option value="all">Todos</option>
+              <option value="trusted">Só confiáveis</option>
+              <option value="active">Ativos</option>
+              <option value="legacy">Legados</option>
+              <option value="ignored">Ignorados</option>
+            </select>
+          </div>
+          <div id="reference-list" class="reference-list" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="badge-n purple">4</span>Respostas em tempo real</div>
+        <div class="card-body">
+          <div id="ref-log" class="live-log">Aguardando envio de referências...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PAGE 5: ANALISADOR ═══════════ -->
+<div id="page-analyzer" class="page">
+  <div class="alert alert-success">
+    ✅ <b>Como usar:</b> Gere a feature no Gerador → execute <code>npm test</code> → cole o output do teste → cole a feature original → Analisar → Selecione correções → Aplicar.
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-hd"><span class="badge-n purple">1</span>Output do Teste (npm test)</div>
+        <div class="card-body">
+          <textarea id="testOutput" class="form-control" rows="10" placeholder="Cole a saída completa do npm test aqui..."></textarea>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-purple" onclick="analisarOutput()">🔍 Analisar Falhas</button>
+            <button class="btn btn-green" onclick="analisarOutputComIA()">✨ Analisar com IA</button>
+            <div id="analysisStatus" style="font-size:12px;color:var(--muted);align-self:center;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><span class="badge-n purple">2</span>Feature Original</div>
+        <div class="card-body">
+          <textarea id="originalFeature" class="form-control" rows="10" placeholder="Cole o conteúdo do arquivo .feature aqui..."></textarea>
+          <button class="btn btn-ghost btn-sm mt-2" onclick="copiarDoGerador()">📋 Copiar do Gerador</button>
+        </div>
+      </div>
+      <div id="analysisResults" style="display:none;">
+        <div class="card">
+          <div class="card-hd"><span class="badge-n purple">3</span>Sugestões de Correção</div>
+          <div class="card-body">
+            <div class="summary-bar" id="summaryBar"></div>
+            <div style="display:flex;align-items:center;margin-bottom:10px;">
+              <input type="checkbox" id="selectAllFixes" onchange="toggleAllFixes(this)" checked style="margin-right:8px;transform:scale(1.2);accent-color:var(--green);">
+              <label for="selectAllFixes" style="font-weight:700;cursor:pointer;font-size:13px;">Selecionar todas</label>
+              <span style="margin-left:auto;font-size:12px;color:var(--muted);" id="fixesCount"></span>
+            </div>
+            <div id="issuesList"></div>
+            <button class="btn btn-green btn-full mt-3" onclick="aplicarCorrecoes()">✅ Aplicar Correções Selecionadas</button>
+            <button class="btn btn-purple btn-full mt-2" id="btn-save-ai-learning" onclick="acceptAIReviewLearning()" style="display:none;">🧠 Salvar aprendizado da revisão com IA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="sticky-preview">
+        <div class="card" style="margin:0">
+          <div class="card-hd" style="border-bottom:none;padding-bottom:0;">
+            <div class="subtabs" style="border-bottom:none;flex:1;margin:-11px -16px 0;">
+              <div class="subtab sel purple" onclick="stab2('fixed')">📄 Feature Corrigida</div>
+              <div class="subtab" onclick="stab2('diff')">📊 Mudanças</div>
+            </div>
+          </div>
+          <div style="padding:12px 14px;">
+            <div id="tab2-fixed" class="preview" style="min-height:420px;">Feature corrigida aparecerá aqui...</div>
+            <div id="tab2-diff" class="preview" style="display:none;min-height:420px;"></div>
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-ghost btn-sm" onclick="copiar2('fixed')" style="flex:1;">📋 Copiar</button>
+              <button class="btn btn-ghost btn-sm" onclick="baixar2()" style="flex:1;">💾 Baixar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/01-config.js"></script>
+<script src="assets/js/02-init.js"></script>
+<script src="assets/js/03-api-key.js"></script>
+<script src="assets/js/04-navigation.js"></script>
+<script src="assets/js/05-swagger-import.js"></script>
+<script src="assets/js/06-ai-generation.js"></script>
+<script src="assets/js/07-manual-generator.js"></script>
+<script src="assets/js/08-state.js"></script>
+<script src="assets/js/09-swagger-helpers.js"></script>
+<script src="assets/js/10-openrouter-client.js"></script>
+<script src="assets/js/12-chat.js"></script>
+<script src="assets/js/13-analyzer.js"></script>
+<script src="assets/js/15-reference-base.js"></script>
+<script src="assets/js/16-reference-analyzer.js"></script>
+<script src="assets/js/17-learning-memory.js"></script>
+<script src="assets/js/18-generation-logger.js"></script>
+<script src="assets/js/19-diff-viewer.js"></script>
+<script src="assets/js/20-ai-reviewer.js"></script>
+<script src="assets/js/14-utils-and-start.js"></script>
+</body>
+</html>
